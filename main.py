@@ -7,10 +7,42 @@ import os
 client = MongoClient('localhost', 27017)
 db = client.crawlingDb
 app = FastAPI()
-@app.get("/")
-def home():
-    return{"data":"test"}
 
+def get_page_counts(year):
+    response = requests.get(f"https://www.cvedetails.com/vulnerability-list.php?vendor_id=0&product_id=0&version_id=0&page=64&hasexp=0&opdos=0&opec=0&opov=0&opcsrf=0&opgpriv=0&opsqli=0&opxss=0&opdirt=0&opmemc=0&ophttprs=0&opbyp=0&opfileinc=0&opginf=0&cvssscoremin=0&cvssscoremax=0&year={year}&month=0&cweid=0&order=1")
+    soup = BeautifulSoup(response.content, "html.parser")
+    paging = soup.find('div', {'id': 'pagingb'})
+    paging_elements = paging.find_all("a")
+    return len(paging_elements)
+
+def extract_text_from_element(element):
+    return element.text.strip()
+
+def extract_float_from_element(element):
+    return float(element.text.strip())
+
+def process_table_row(row):
+    td_elements = row.find_all('td')
+    cve_id = extract_text_from_element(td_elements[1])
+    vulnerability_type = extract_text_from_element(td_elements[4])
+    publish_date = extract_text_from_element(td_elements[5])
+    update_date = extract_text_from_element(td_elements[6])
+    cvss = extract_float_from_element(td_elements[7])
+
+    existing_data = db.data.find_one({"cve_id": cve_id})
+    if existing_data:
+        return None
+
+    doc = {
+        'cve_id': cve_id,
+        'vulnerability_type': vulnerability_type,
+        'publish_date': publish_date,
+        'update_date': update_date,
+        'score': cvss
+    }
+    db.data.insert_one(doc)
+    doc.pop('_id', None)
+    return doc
 def save_last_page_to_file(year, page_number):
     filename = f"last_page_{year}.txt"  # 해당 연도에 대한 파일명 생성
     with open(filename, "w") as file:
@@ -25,7 +57,9 @@ def load_last_page_from_file(year):
     else:  # 파일이 존재하지 않는 경우
         return None
 
-#크롤링 시작
+@app.get("/")
+def home():
+    return{"data":"test"}
 @app.get("/crawl_since_2022")
 def crawl_since_2022():
     data = []
@@ -34,10 +68,10 @@ def crawl_since_2022():
         response = requests.get(f"https://www.cvedetails.com/vulnerability-list.php?vendor_id=0&product_id=0&version_id=0&page=64&hasexp=0&opdos=0&opec=0&opov=0&opcsrf=0&opgpriv=0&opsqli=0&opxss=0&opdirt=0&opmemc=0&ophttprs=0&opbyp=0&opfileinc=0&opginf=0&cvssscoremin=0&cvssscoremax=0&year={year}&month=0&cweid=0&order=1")
         soup = BeautifulSoup(response.content, "html.parser")
 
-        # how_many_pages라는 변수에 각 년도의 cve_id가 몇 페이지까지 있는지 담아둡니다.
+        # page_counts라는 변수에 각 년도의 cve_id가 몇 페이지까지 있는지 담아둡니다.
         paging = soup.find('div', {'id': 'pagingb'})
         paging_elements = paging.find_all("a")
-        how_many_pages = len(paging_elements)
+        page_counts = get_page_counts(year)
 
         # 네트워크 중단고려. 어디까지 저장했는지
         last_page = load_last_page_from_file(year)  # 이전에 저장한 마지막 페이지 번호를 불러옵니다.
@@ -46,11 +80,11 @@ def crawl_since_2022():
         else: #저장된 중단 백업용 파일이 없다면
             start_page = 1
 
-        #연도별로 데이터 수집하는 구간. 우선은 테스트를 위해 51라인 주석처리 후 연도별 200개씩만 수집
-        # for i in range(start_page, how_many_pages + 1):
+        #연도별로 데이터 수집하는 구간. 우선은 테스트를 위해 주석처리 후 연도별 200개씩만 수집
+        # for i in range(start_page, page_counts + 1):
         for i in range(start_page, 5):
             try:
-                href = paging_elements[i].attrs['href']
+                href = paging_elements[i-1].attrs['href']
                 response = requests.get(f"https://www.cvedetails.com"+href)
                 soup = BeautifulSoup(response.content, "html.parser")
                 table = soup.find('table', {'class': 'searchresults sortable'})
@@ -62,23 +96,9 @@ def crawl_since_2022():
                         continue
                     #짝수번째 tr은 summary를 담고잇어서 제외.
                     if idx % 2 == 1:
-                        cve_id = td_elements[1].text.strip()
-                        publish_date = td_elements[5].text.strip()
-                        update_date = td_elements[6].text.strip()
-                        cvss = float(td_elements[7].text.strip())
-
-                        #중단된 경우를 위해 데이터베이스에 이미 존재하는 cve_id인지 확인
-                        existing_data = db.data.find_one({"cve_id": cve_id})
-                        if existing_data:
-                            continue  # 이미 존재하는 경우 스킵.
-
-                        doc = {
-                            'cve_id': cve_id,
-                            'publish_date': publish_date,
-                            'update_date': update_date,
-                            'score': cvss
-                        }
-                        db.data.insert_one(doc)
+                        doc = process_table_row(tr)
+                        if doc is not None:
+                            data.append(doc)
                 save_last_page_to_file(year, i)  # 현재 페이지 번호를 파일에 저장
             except requests.exceptions.RequestException as e:
                 # 네트워크 연결이 끊겼거나 요청에 오류가 발생한 경우에 대한 예외 처리
@@ -92,7 +112,7 @@ def crawl_since_2022():
 
 
 
-    return {"message": data }
+    return {"message": "완" }
 
 #http://127.0.0.1:8000/findby_publish_date/?start_date=2022-12-22&end_date=2022-12-29
 @app.get("/findby_publish_date/") #publish date로 filtering
@@ -152,6 +172,7 @@ def findby_publish_date(start_date: str = None, end_date: str = None):
         "data": data,
         "count": count
     }
+
 
 #http://127.0.0.1:8000/findby_update_date/?start_date=2022-12-22&end_date=2022-12-29
 @app.get("/findby_update_date/")
