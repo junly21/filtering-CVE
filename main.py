@@ -4,7 +4,8 @@ from bs4 import BeautifulSoup
 from pymongo import MongoClient
 from datetime import datetime
 import os
-client = MongoClient('mongodb', 27017)
+client = MongoClient('mongodb', 27017) #도커 환경
+#client = MongoClient('localhost', 27017) #로컬환경
 db = client.crawlingDb
 app = FastAPI()
 
@@ -59,7 +60,8 @@ def load_last_page_from_file(year):
 
 @app.get("/")
 def home():
-    return{"data":"test2ㅇㅇ"}
+    return{"data":"test in docker222"}
+
 @app.get("/crawl_since_2022")
 def crawl_since_2022():
     data = []
