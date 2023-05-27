@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from pymongo import MongoClient
 from datetime import datetime
 import os
-client = MongoClient('localhost', 27017)
+client = MongoClient('mongodb', 27017)
 db = client.crawlingDb
 app = FastAPI()
 
@@ -59,7 +59,7 @@ def load_last_page_from_file(year):
 
 @app.get("/")
 def home():
-    return{"data":"test"}
+    return{"data":"test2ㅇㅇ"}
 @app.get("/crawl_since_2022")
 def crawl_since_2022():
     data = []
@@ -114,7 +114,7 @@ def crawl_since_2022():
 
     return {"message": "완" }
 
-#http://127.0.0.1:8000/findby_publish_date/?start_date=2022-12-22&end_date=2022-12-29
+
 @app.get("/findby_publish_date/") #publish date로 filtering
 def findby_publish_date(start_date: str = None, end_date: str = None):
 
