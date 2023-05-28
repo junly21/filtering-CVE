@@ -1,21 +1,24 @@
 # Theori-Recruit-assignment
 
 ## Description
-https://www.cvedetails.com 사이트의 데이터를 크롤링하 DB에 저장 후 api에 따라 기간/점수로 filtering하는 코드입니다.
+You can crawl data at https://www.cvedetails.com and store in database. Each api help you search data filtering by date/score.
 
 ## Environment
-실행환경
+Python3</br>
+Fastapi</br>
+mongoDB
+
 
 ## Prerequisite
-1. FastAPI
-2. requests
-3. BeautifulSoup
-4. pymongo
+all you need are in requirements.txt
 
 ## Usage
 
-1. http://127.0.0.1:8000/crawl_since_2022 로 접속하면 크롤링을 통해 2022년도부터 2023년도까지의 cve data를 수집합니다.</br></br>
-2. 이 때 생성되는 last_page_{year}.txt는 네트워크 혹은 컴퓨터가 down 될 경우를 고려해 몇년도의 몇페이지까지 정보를 저장하였는지 작성합니다.</br></br>
-4. http://127.0.0.1:8000/findby_publish_date/?start_date={시작날짜}&end_date={종료날짜}를 통해 publish date filter를 설정하여 데이터를 조회할 수 있습니다. 시작일과 종료일 둘 다 입력해도 괜찮고, 둘 중 하나만 입력해도 괜찮습니다. 단,  이 때 날짜의 형식이 맞지 않거나 시작 날짜보다 종료일이 빠르면 오류를 반환합니다.</br></br>
-5. publish_date를 update_date로 바꾸어 업데이트 일에 따른 filtering이 가능합니다.</br></br>
-6. #http://127.0.0.1:8000/findby_cvss_score/?min_score={점수입력}&max_score={점수입력}을 통해 score로 filtering을 할 수 있습니다.</br></br>
+1. open your terminal and install all packages </br> ``` pip install -r requirements.txt ``` </br>*if you want, you can build docker-compose* </br></br>
+2.  you can run project by type ```uvicorn main:app --reload``` in your terminal </br></br>
+3. http://127.0.0.1:8000/crawl_since_2022 this URL crawl cve list since 2002</br></br>
+4. **last_page_{year}.txt** writes number of finished pages to consider situation where the network might go down in the middle of a crawl, or the
+computer the crawler is running on might suddenly turn off.</br></br> 
+5. by using http://127.0.0.1:8000/findby_publish_date/?start_date={start_date}&end_date={end_date}, you can search data filtered by puplished date. you can input only start date or end date. you can also input both of them. but it returns error in this cases: <ol>1.date type error</br>2.if end date is faster than start date  </ol></br> 
+6. you can change **publish_date** in URL to **update_date** to filter data by update date.</br></br> 
+7. by using http://127.0.0.1:8000/findby_cvss_score/?min_score={점수입력}&max_score={점수입력}을 you can filter data by cvss score range.</br></br>
